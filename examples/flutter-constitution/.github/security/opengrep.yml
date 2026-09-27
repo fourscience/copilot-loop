@@ -1,0 +1,80 @@
+# Security rules for OpenGrep (Semgrep-compatible).
+#
+# Run with:
+#   opengrep scan --config .github/security/opengrep.yml --json --error --metrics=off .
+#
+# As with the architecture rules, Dart's structural-pattern support is
+# limited in Semgrep/OpenGrep, so most checks below use `pattern-regex`.
+# These are heuristics meant to catch obvious, common mistakes -- they are
+# not a substitute for a full secrets scanner or a security review.
+rules:
+  - id: no_pii_in_logs
+    message: >
+      Logging calls should not include personally identifiable information
+      (email, phone, password, token, ssn, birth date, etc). Redact or
+      remove the sensitive field before logging.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: security
+    paths:
+      include:
+        - "lib/**"
+    pattern-regex: (?mi)\b(print|debugPrint|log|developer\.log)\s*\([^)]*\b(email|phone|password|token|ssn|birthDate|birth_date|dateOfBirth|creditCard|credit_card)\b
+
+  - id: hardcoded_secret
+    message: >
+      Possible hardcoded secret. String literals assigned to identifiers
+      like apiKey/secret/password/token should come from secure config or
+      environment injection, not be embedded in source.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: security
+    paths:
+      include:
+        - "lib/**"
+    pattern-regex: (?mi)\b(api[_]?key|secret|password|token)\s*[:=]\s*['"][A-Za-z0-9_\-\.\/+=]{12,}['"]
+
+  - id: insecure_http
+    message: >
+      Use https:// instead of http:// for network requests. Plain HTTP
+      traffic can be intercepted or tampered with in transit.
+    severity: WARNING
+    languages: [dart]
+    metadata:
+      category: security
+    paths:
+      include:
+        - "lib/**"
+    patterns:
+      - pattern-regex: (?m)['"]http://
+      - pattern-not-regex: (?m)['"]http://(localhost|127\.0\.0\.1|10\.0\.2\.2)
+
+  - id: insecure_storage
+    message: >
+      Do not store tokens, passwords, or secrets with SharedPreferences; it
+      is unencrypted on-disk storage. Use a secure storage mechanism (e.g.
+      flutter_secure_storage / platform keychain) instead.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: security
+    paths:
+      include:
+        - "lib/**"
+    pattern-regex: (?mi)\.setString\s*\(\s*['"][^'"]*(token|password|secret)[^'"]*['"]
+
+  - id: bad_certificate_callback
+    message: >
+      badCertificateCallback must not unconditionally accept invalid
+      certificates. Returning true here disables TLS certificate
+      validation and exposes the app to man-in-the-middle attacks.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: security
+    paths:
+      include:
+        - "lib/**"
+    pattern-regex: (?ms)badCertificateCallback\s*=.*?=>\s*true

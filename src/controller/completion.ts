@@ -115,7 +115,14 @@ export async function requiredTestDiagnostics(task: TaskContract, results: reado
 
 /** Strips `:line` and `#test name` suffixes from reviewer evidence. */
 function evidencePath(e: string): string {
-  return e.replace(/#.*$/, '').replace(/:\d+(?::\d+)?$/, '').trim();
+  return e
+    .trim()
+    .replace(/^[`'"]+|[`'"]+$/g, '')
+    .replace(/^\.\//, '')
+    .replace(/#.*$/, '')
+    .replace(/\s+\(.*\)$/, '')
+    .replace(/:\d+(?:[:-]\d+)?$/, '')
+    .trim();
 }
 
 /**

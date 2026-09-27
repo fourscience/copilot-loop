@@ -160,6 +160,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   command('copilotLoop.resume', async () => {
     const s = await getServices();
+    const record = s.controller.current;
+    if (record) {
+      const current = await s.taskLoader.load(record.taskPath).catch(() => undefined);
+      if (current && current.hash !== record.taskHash) {
+        log.warn(`Task file ${record.taskPath} changed since the run started; the run continues with the original contract.`);
+        void vscode.window.showWarningMessage(`The task file changed since ${record.task.id} started. The run continues with the original contract; start a new run to use the edited one.`);
+      }
+    }
     background(s, s.controller.resume());
   });
 

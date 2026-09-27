@@ -75,8 +75,16 @@ export function updateFingerprints(
       ? { ...prior, fingerprint: fp, consecutive: prior.consecutive + 1, total: prior.total + 1, lastSeenIteration: iteration }
       : { fingerprint: fp, consecutive: 1, total: 1, firstSeenIteration: iteration, lastSeenIteration: iteration };
   }
+  // Bound growth on very noisy repositories: forget the oldest resolved failures first.
+  const keys = Object.keys(next);
+  if (keys.length > MAX_FINGERPRINT_RECORDS) {
+    const resolved = keys.filter((k) => next[k]?.consecutive === 0).sort((a, b) => (next[a]?.lastSeenIteration ?? 0) - (next[b]?.lastSeenIteration ?? 0));
+    for (const k of resolved.slice(0, keys.length - MAX_FINGERPRINT_RECORDS)) delete next[k];
+  }
   return next;
 }
+
+const MAX_FINGERPRINT_RECORDS = 2000;
 
 export function repeatedFailures(records: Readonly<Record<string, FingerprintRecord>>, maxSameFailure: number): FingerprintRecord[] {
   return Object.values(records).filter((r) => r.consecutive >= maxSameFailure);

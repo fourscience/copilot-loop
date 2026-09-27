@@ -160,6 +160,8 @@ export const implement: PhaseHandler = async (ctx, record) => {
   return { record: { ...rest, criteria, changedFiles: changed }, next: 'VALIDATE', reason: `implementer ${inv.result.outcome}`, history: [agentHistory(inv)] };
 };
 
+const MAX_PERSISTED_FAILURES = 500;
+
 function dedupe(diagnostics: readonly Diagnostic[]): Diagnostic[] {
   const seen = new Set<string>();
   return diagnostics.filter((d) => {
@@ -168,6 +170,13 @@ function dedupe(diagnostics: readonly Diagnostic[]): Diagnostic[] {
     seen.add(key);
     return true;
   });
+}
+
+/** Executed (passed + failed, excluding skipped) tests across gates that report per-test results. */
+function countTests(results: readonly GateResult[]): number | undefined {
+  const reporting = results.filter((g) => g.metrics.testsPassed !== undefined);
+  if (reporting.length === 0) return undefined;
+  return reporting.reduce((n, g) => n + (g.metrics.testsPassed ?? 0) + (g.metrics.testsFailed ?? 0), 0);
 }
 
 export const validate: PhaseHandler = async (ctx, record) => {
@@ -184,7 +193,13 @@ export const validate: PhaseHandler = async (ctx, record) => {
 
   const snapshot = analyseGateResults(results);
   const { criteria, diagnostics: criteriaDiagnostics } = await evaluateCriteria(record.task, record.criteria, results, exists(deps));
-  const controllerDiagnostics = dedupe([...criteriaDiagnostics, ...(await requiredTestDiagnostics(record.task, results, exists(deps)))]);
+  const testCount = countTests(results);
+  const weakening: Diagnostic[] = [];
+  if (testCount !== undefined && record.maxTestCount !== undefined && testCount < record.maxTestCount && results.every((g) => g.metrics.testsFailed === undefined || g.metrics.testsFailed === 0)) {
+    // Tests pass but fewer of them run than before: tests were deleted or skipped to get green.
+    weakening.push({ gate: 'controller', category: 'test', severity: 'error', rule: 'tests_removed', message: `The number of executed tests dropped from ${record.maxTestCount} to ${testCount} while tests pass. Tests must not be deleted or skipped to make the suite green; restore them.` });
+  }
+  const controllerDiagnostics = dedupe([...criteriaDiagnostics, ...(await requiredTestDiagnostics(record.task, results, exists(deps))), ...weakening]);
   const failures = dedupe([...snapshot.failures, ...controllerDiagnostics]);
   const fingerprints = failures.map((d) => ({ key: fingerprintKey(fingerprint(d)), fingerprint: fingerprint(d) }));
   const fpRecords = updateFingerprints(record.fingerprints, { ...snapshot, fingerprints }, record.iteration);
@@ -194,7 +209,7 @@ export const validate: PhaseHandler = async (ctx, record) => {
   const next: LoopRecord = {
     ...record,
     lastGateResults: stripped,
-    lastFailures: failures,
+    lastFailures: failures.slice(0, MAX_PERSISTED_FAILURES),
     controllerDiagnostics,
     criteria,
     requirements: evaluateRequirements(record.task, results),
@@ -202,6 +217,7 @@ export const validate: PhaseHandler = async (ctx, record) => {
     progress: [...record.progress, sample].slice(-100),
     changedFiles: changed,
     validatedWorkspace: await deps.git.workspaceFingerprint(ctx.signal),
+    ...(testCount !== undefined ? { maxTestCount: Math.max(testCount, record.maxTestCount ?? 0) } : {}),
   };
   const history: HistoryPart = { gates, gateOutput, diagnostics: failures.slice(0, 200), notes: [`${failures.length} blocking failure(s); ${snapshot.passingGates.length}/${results.length} gates passing`] };
 

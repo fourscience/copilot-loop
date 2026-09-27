@@ -170,6 +170,8 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     mutates: false,
     handler: async (input, ctx) => {
       const rel = ctx.policy.assertReadable(str(input, 'path') ?? '');
+      // The path is appended to the gate command; never let it be interpreted as an option.
+      if (rel.startsWith('-') || rel.split('/').some((seg) => seg.startsWith('-'))) throw new LoopError('TOOL_FAILED', `Invalid test path '${rel}'`);
       if (!(await ctx.repository.exists(rel))) throw new LoopError('TOOL_FAILED', `Test file '${rel}' does not exist`);
       const gateId = ctx.allowedGates.find((g) => ctx.gateRegistry.get(g)?.acceptsPathArgument);
       if (!gateId) throw new LoopError('TOOL_FAILED', 'This task has no test gate that accepts a single test path');

@@ -1,0 +1,85 @@
+# Architecture rules for OpenGrep (Semgrep-compatible).
+#
+# Run with:
+#   opengrep scan --config .github/architecture/opengrep.yml --json --error --metrics=off .
+#
+# Dart's grammar support in Semgrep/OpenGrep engines is limited, so most rules
+# here use `pattern-regex` against import lines rather than structural
+# `pattern`s. Regex rules are approximations: they catch the common cases
+# (single-line `import '...';`) but can miss multi-line or heavily aliased
+# imports. Tighten `paths:` globs for your own repo layout as needed.
+rules:
+  - id: domain_flutter
+    message: >
+      Domain layer files must not import Flutter or dart:ui. The domain
+      layer must stay pure Dart so it can be tested and reused without the
+      Flutter SDK.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: architecture
+    paths:
+      include:
+        - "lib/**/domain/**"
+    pattern-regex: (?m)^\s*import\s+['"](package:flutter/|dart:ui)
+
+  - id: forbidden_dependencies
+    message: >
+      Direct imports of state-management packages are forbidden anywhere
+      under lib/. Route state management through the approved abstraction
+      layer instead of importing these packages directly.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: architecture
+    paths:
+      include:
+        - "lib/**"
+    pattern-regex: (?m)^\s*import\s+['"]package:(flutter_bloc|bloc|riverpod|flutter_riverpod|hooks_riverpod)/
+
+  - id: vertical_slice
+    message: >
+      A file inside one feature slice must not reach into another feature's
+      internal layers (data/domain/presentation). Cross-feature access
+      should go through that feature's public barrel file instead.
+      NOTE: this regex is an approximation. It flags any import path that
+      contains "features/<name>/(data|domain|presentation)/" and cannot
+      tell whether the importer is itself inside that same feature, so it
+      may under- or over-report at slice boundaries; tighten it per-repo if
+      you need precise same-feature exclusion (e.g. by running it per
+      feature directory with a scoped `paths.exclude`).
+    severity: WARNING
+    languages: [dart]
+    metadata:
+      category: architecture
+    paths:
+      include:
+        - "lib/features/**"
+    pattern-regex: (?m)^\s*import\s+['"](package:[^'"]+/)?features/[^/'"]+/(data|domain|presentation)/
+
+  - id: viewmodel_no_widgets
+    message: >
+      View models must be UI-agnostic. *_view_model.dart files must not
+      import Flutter widget or material libraries.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: architecture
+    paths:
+      include:
+        - "lib/**/*_view_model.dart"
+    pattern-regex: (?m)^\s*import\s+['"]package:flutter/(widgets|material)\.dart['"]
+
+  - id: data_not_in_presentation
+    message: >
+      Presentation layer files must not import the data layer directly.
+      Presentation should depend on domain (and view models), not on data
+      sources or repositories' concrete implementations.
+    severity: ERROR
+    languages: [dart]
+    metadata:
+      category: architecture
+    paths:
+      include:
+        - "lib/**/presentation/**"
+    pattern-regex: (?m)^\s*import\s+['"](package:[^'"]+/)?.*/data/

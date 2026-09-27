@@ -123,6 +123,8 @@ export interface LoopRecord {
   /** Workspace tree when the task started; changed files are computed against it. */
   baseline?: string;
   reviewRejections: number;
+  /** Highest number of executed (non-skipped) tests seen in a validation; used to detect deleted/skipped tests. */
+  maxTestCount?: number;
   /** Consecutive REVIEW → VALIDATE bounces caused by the workspace changing outside the loop. */
   unstableReviews: number;
   /** Escalation level for no-progress handling (0 = normal routing). */

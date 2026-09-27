@@ -87,15 +87,15 @@ export class GitCli implements Git {
       const item = parts[i] as string;
       if (item.length < 4) continue;
       const status = item.slice(0, 2);
-      entries.push({ status, path: toPosixPath(item.slice(3)) });
+      const p = toPosixPath(item.slice(3));
+      if (p !== '.copilot-loop' && !p.startsWith('.copilot-loop/')) entries.push({ status, path: p });
       if (status.startsWith('R') || status.startsWith('C')) i++; // skip rename source
     }
     return entries;
   }
 
   async diff(options: { path?: string; maxBytes?: number; signal?: AbortSignal } = {}): Promise<string> {
-    const args = ['diff', 'HEAD', '--no-color', '--no-ext-diff'];
-    if (options.path) args.push('--', options.path);
+    const args = ['diff', 'HEAD', '--no-color', '--no-ext-diff', '--', options.path ?? '.', ...SNAPSHOT_EXCLUDES];
     const hasHead = (await this.git(['rev-parse', '--verify', '-q', 'HEAD'], { allowFailure: true })).trim() !== '';
     const out = await this.git(hasHead ? args : args.filter((a) => a !== 'HEAD'), { ...(options.signal ? { signal: options.signal } : {}), maxOutputBytes: options.maxBytes ?? 1024 * 1024 });
     return out;

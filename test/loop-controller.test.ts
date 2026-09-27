@@ -284,3 +284,20 @@ describe('interrupt', () => {
     expect(done.iteration).toBe(1);
   });
 });
+
+describe('test weakening', () => {
+  it('flags a drop in executed tests even when the suite is green', async () => {
+    const h = await makeHarness({
+      script: [
+        { tests: { diagnostics: [fail('tests', 'test', 'broken', { rule: 'b' })], metrics: { testsPassed: 9, testsFailed: 1 } } },
+        { tests: { metrics: { testsPassed: 7, testsFailed: 0 } } },
+        { tests: { metrics: { testsPassed: 10, testsFailed: 0 } } },
+      ],
+    });
+    const final = await h.controller.start(loadTask());
+    expect(final.state).toBe('DONE');
+    const second = h.store.history.filter((e) => e.phase === 'VALIDATE')[1]!;
+    expect(second.diagnostics.map((d) => d.rule)).toContain('tests_removed');
+    expect(h.calls.filter((c) => c === 'Test Engineer')).toHaveLength(2);
+  });
+});
