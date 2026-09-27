@@ -107,8 +107,18 @@ export class GitCli implements Git {
     const index = path.join(dir, 'index');
     try {
       const env = { GIT_INDEX_FILE: index };
+      // Start from a copy of the real index so its stat cache avoids re-hashing unchanged files
+      // (important for very large repositories). The real index is never modified.
+      const realIndex = path.resolve(this.root, (await this.git(['rev-parse', '--git-path', 'index'])).trim());
+      let copied = false;
+      try {
+        await fs.copyFile(realIndex, index);
+        copied = true;
+      } catch {
+        copied = false;
+      }
       const hasHead = (await this.git(['rev-parse', '--verify', '-q', 'HEAD'], { allowFailure: true })).trim() !== '';
-      if (hasHead) await this.git(['read-tree', 'HEAD'], { env, ...(signal ? { signal } : {}) });
+      if (!copied && hasHead) await this.git(['read-tree', 'HEAD'], { env, ...(signal ? { signal } : {}) });
       await this.git(['add', '-A', '--', '.'], { env, ...(signal ? { signal } : {}) });
       return (await this.git(['write-tree'], { env })).trim();
     } finally {

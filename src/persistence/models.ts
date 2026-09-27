@@ -1,6 +1,6 @@
 import type { ErrorCode } from '../core/errors';
 import type { FingerprintRecord, ProgressSample } from '../diagnosis/failure-analyzer';
-import type { Diagnostic, DiagnosticCategory, GateMetrics, GateStatus } from '../gates/gate-types';
+import type { Diagnostic, DiagnosticCategory, GateMetrics, GateResult, GateStatus } from '../gates/gate-types';
 import type { TaskContract } from '../tasks/task-schema';
 
 export const LOOP_STATES = ['INTAKE', 'PLAN', 'IMPLEMENT', 'VALIDATE', 'DIAGNOSE', 'FIX', 'REVIEW', 'DONE', 'BLOCKED', 'PAUSED', 'STOPPED'] as const;
@@ -117,6 +117,11 @@ export interface LoopRecord {
   /** Number of modification iterations (IMPLEMENT + FIX steps) started. */
   iteration: number;
   agentRuns: number;
+  /** Iteration / agent-run counters at the last human Retry; limits apply to the difference. */
+  iterationBase: number;
+  agentRunBase: number;
+  /** Workspace tree when the task started; changed files are computed against it. */
+  baseline?: string;
   reviewRejections: number;
   /** Escalation level for no-progress handling (0 = normal routing). */
   escalation: number;
@@ -124,11 +129,21 @@ export interface LoopRecord {
   plan?: PlanRecord;
   criteria: CriterionRecord[];
   requirements: RequirementStatus[];
-  lastGates: GateRunSummary[];
+  /** Last validation results without raw stdout/stderr (kept in history). */
+  lastGateResults: GateResult[];
   lastFailures: Diagnostic[];
+  /** Controller-generated findings (missing required tests etc.) from the last validation. */
+  controllerDiagnostics: Diagnostic[];
   /** Workspace fingerprint captured at the last validation. */
   validatedWorkspace?: string;
   pending: Assignment[];
+  /** Specialists used in the most recent FIX step (for no-progress specialist switching). */
+  lastFixAgents: SpecialistAgentId[];
+  /**
+   * Set when a modifying step (IMPLEMENT/FIX) has consumed an iteration, so a
+   * step interrupted by pause/restart does not consume another one on resume.
+   */
+  claimedIteration?: { state: LoopState; iteration: number };
   fingerprints: Record<string, FingerprintRecord>;
   progress: ProgressSample[];
   changedFiles: string[];
