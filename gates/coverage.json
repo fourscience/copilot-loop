@@ -1,0 +1,12 @@
+{
+  "id": "coverage",
+  "name": "Test coverage",
+  "description": "Runs tests with coverage and enforces a minimum line coverage from coverage/lcov.info.",
+  "category": "coverage",
+  "command": "flutter",
+  "args": ["test", "--coverage"],
+  "parser": "lcov",
+  "parserOptions": { "lcovPath": "coverage/lcov.info", "minCoverage": 80 },
+  "timeoutMs": 1800000,
+  "successExitCodes": [0]
+}

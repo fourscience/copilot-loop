@@ -1,0 +1,11 @@
+{
+  "id": "dart_analyze",
+  "name": "dart analyze",
+  "description": "Dart static analysis (compile errors, type errors, analyzer lints).",
+  "category": "compile",
+  "command": "dart",
+  "args": ["analyze", "--format=machine"],
+  "parser": "dart-analyze",
+  "timeoutMs": 900000,
+  "successExitCodes": [0]
+}

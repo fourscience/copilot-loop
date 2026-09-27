@@ -1,0 +1,12 @@
+{
+  "id": "flutter_test",
+  "name": "flutter test",
+  "description": "Runs the Flutter test suite with the JSON reporter so each failing test becomes a structured diagnostic.",
+  "category": "test",
+  "command": "flutter",
+  "args": ["test", "--reporter", "json"],
+  "parser": "flutter-test",
+  "timeoutMs": 1800000,
+  "successExitCodes": [0],
+  "acceptsPathArgument": true
+}
