@@ -1,0 +1,11 @@
+{
+  "id": "opengrep",
+  "name": "OpenGrep architecture rules",
+  "description": "OpenGrep scan with the repository's architecture rule set. Findings are architecture violations.",
+  "category": "architecture",
+  "command": "opengrep",
+  "args": ["scan", "--config", ".github/architecture/opengrep.yml", "--json", "--error", "--metrics=off", "."],
+  "parser": "semgrep-json",
+  "timeoutMs": 900000,
+  "successExitCodes": [0]
+}

@@ -1,0 +1,86 @@
+# Example Copilot Loop task contract. Validate against schemas/task.schema.json.
+id: AUTH-142
+
+title: Implement biometric re-authentication
+
+goal: >
+  Implement biometric re-authentication after inactivity
+  while preserving the existing authentication architecture.
+
+constraints:
+  - no new third-party dependencies
+  - no BLoC
+  - no Riverpod
+  - MVVM
+  - vertical slices
+  - domain must not depend on Flutter
+  - no PII in logs
+  - preserve existing public APIs unless explicitly required
+  - do not weaken architecture rules
+
+# Plain strings get ids AC-001, AC-002, ... Objects may declare deterministic evidence.
+acceptance:
+  - id: AC-001
+    description: biometric authentication is requested after inactivity
+    evidence:
+      tests: [test/auth/biometric_reauth_test.dart]
+  - id: AC-002
+    description: successful authentication restores authenticated state
+    evidence:
+      tests: [test/auth/biometric_reauth_test.dart]
+  - id: AC-003
+    description: failed authentication leaves the user unauthenticated
+    evidence:
+      tests: [test/auth/biometric_reauth_test.dart]
+  - id: AC-004
+    description: cancellation does not crash the application
+  - id: AC-005
+    description: existing authentication tests remain green
+    evidence:
+      gates: [flutter_test]
+  - id: AC-006
+    description: new behavior has tests
+    evidence:
+      tests: [test/auth/biometric_reauth_test.dart]
+  - id: AC-007
+    description: architecture validation passes
+    evidence:
+      gates: [architecture, opengrep]
+
+required_tests:
+  - test/auth/biometric_reauth_test.dart
+
+gates:
+  - dart_analyze
+  - flutter_test
+  - dcm
+  - opengrep
+  - architecture
+  - security
+
+# Requirement -> gate mapping (gate or gate.rule). Rule matching is suffix-based,
+# so `opengrep.domain_flutter` matches check_id `.github.architecture.domain_flutter`.
+requirements:
+  MVVM:
+    gates: [architecture.mvvm]
+  vertical_slices:
+    gates: [architecture.vertical_slice]
+  no_flutter_in_domain:
+    gates: [opengrep.domain_flutter]
+  no_bloc:
+    gates: [opengrep.forbidden_dependencies]
+  duplication:
+    gates: [dcm]
+
+limits:
+  max_iterations: 30
+  max_same_failure: 3
+  max_agent_turns: 30
+
+git:
+  checkpoints: false
+
+context:
+  relevant_paths:
+    - lib/features/auth
+    - test/auth

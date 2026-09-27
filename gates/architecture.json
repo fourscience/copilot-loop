@@ -1,0 +1,11 @@
+{
+  "id": "architecture",
+  "name": "Architecture validator",
+  "description": "Repository-specific architecture validator (e.g. the Flutter Constitution checker). Must print diagnostics as JSON lines or `file:line:col: error: message [rule]`.",
+  "category": "architecture",
+  "command": "dart",
+  "args": ["run", "tool/architecture_validator.dart"],
+  "parser": "generic",
+  "timeoutMs": 600000,
+  "successExitCodes": [0]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "dcm",
+  "name": "DCM",
+  "description": "DCM (Dart Code Metrics) lint, metrics and duplication checks. Adjust the reporter flag to your DCM version if needed.",
+  "category": "lint",
+  "command": "dcm",
+  "args": ["analyze", "--reporter=codeclimate", "lib"],
+  "parser": "codeclimate",
+  "timeoutMs": 900000,
+  "successExitCodes": [0]
+}

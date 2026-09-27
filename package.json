@@ -1,0 +1,109 @@
+{
+  "name": "copilot-loop",
+  "displayName": "Copilot Loop",
+  "description": "Deterministic, controller-first multi-agent engineering loop for GitHub Copilot via the VS Code Language Model API.",
+  "version": "0.1.0",
+  "publisher": "fourscience",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fourscience/copilot-loop"
+  },
+  "engines": {
+    "vscode": "^1.95.0",
+    "node": ">=20"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "copilot",
+    "agents",
+    "flutter",
+    "orchestrator",
+    "language model"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:.copilot-loop/state.json"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Copilot Loop executes validation commands and lets agents edit files; it requires a trusted workspace."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      { "command": "copilotLoop.start", "title": "Start Task", "category": "Copilot Loop" },
+      { "command": "copilotLoop.pause", "title": "Pause", "category": "Copilot Loop" },
+      { "command": "copilotLoop.resume", "title": "Resume", "category": "Copilot Loop" },
+      { "command": "copilotLoop.stop", "title": "Stop", "category": "Copilot Loop" },
+      { "command": "copilotLoop.status", "title": "Status", "category": "Copilot Loop" },
+      { "command": "copilotLoop.validate", "title": "Validate", "category": "Copilot Loop" },
+      { "command": "copilotLoop.retry", "title": "Retry", "category": "Copilot Loop" },
+      { "command": "copilotLoop.openTask", "title": "Open Task", "category": "Copilot Loop" },
+      { "command": "copilotLoop.showHistory", "title": "Show History", "category": "Copilot Loop" },
+      { "command": "copilotLoop.rollback", "title": "Roll Back to Checkpoint", "category": "Copilot Loop" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "copilotLoop", "title": "Copilot Loop", "icon": "$(sync)" }
+      ]
+    },
+    "views": {
+      "copilotLoop": [
+        { "id": "copilotLoop.dashboard", "name": "Loop" }
+      ]
+    },
+    "configuration": {
+      "title": "Copilot Loop",
+      "properties": {
+        "copilotLoop.modelPreferences": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": { "type": "string" },
+          "markdownDescription": "Optional per-agent model family preference, e.g. `{ \"architect\": \"gpt-5\" }`. The value is matched as a substring against Copilot model family/id. If no match is available, capability-based selection is used. Only Copilot models are ever used."
+        },
+        "copilotLoop.gateTimeoutMs": {
+          "type": "number",
+          "default": 900000,
+          "minimum": 1000,
+          "description": "Default timeout for a validation gate when the gate definition does not specify one."
+        },
+        "copilotLoop.logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Minimum level written to the Copilot Loop output channel."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "watch": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "package": "npm run check && npx --yes @vscode/vsce package",
+    "vscode:prepublish": "npm run build"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^22.20.4",
+    "@types/vscode": "~1.95.0",
+    "eslint": "^9.39.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4"
+  }
+}

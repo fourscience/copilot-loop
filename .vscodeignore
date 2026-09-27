@@ -1,0 +1,12 @@
+.vscode/**
+.github/**
+src/**
+test/**
+coverage/**
+**/*.map
+**/*.ts
+tsconfig*.json
+vitest.config.ts
+eslint.config.mjs
+.copilot-loop/**
+node_modules/.bin/**

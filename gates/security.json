@@ -1,0 +1,11 @@
+{
+  "id": "security",
+  "name": "Security rules",
+  "description": "OpenGrep scan with the repository's security rule set (secrets, PII in logs, insecure storage, unsafe network usage).",
+  "category": "security",
+  "command": "opengrep",
+  "args": ["scan", "--config", ".github/security/opengrep.yml", "--json", "--error", "--metrics=off", "."],
+  "parser": "semgrep-json",
+  "timeoutMs": 900000,
+  "successExitCodes": [0]
+}
