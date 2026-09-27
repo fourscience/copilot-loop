@@ -40,18 +40,28 @@ class Violation {
   String toString() => '$path:$line:1: error: $message [$ruleId]';
 }
 
+/// This package's name from pubspec.yaml, used to resolve `package:<self>/...`
+/// imports (the most common import style in Flutter apps).
+String? _packageName;
+
+String? readPackageName() {
+  final pubspec = File('pubspec.yaml');
+  if (!pubspec.existsSync()) return null;
+  final match = RegExp(r'^name:\s*([A-Za-z0-9_]+)\s*$', multiLine: true)
+      .firstMatch(pubspec.readAsStringSync());
+  return match?.group(1);
+}
+
 /// Resolves an import target to a slash-separated path relative to `lib/`,
-/// or null if it is a `dart:` import or a `package:` import that points
-/// outside this package's `lib/` (we only care about intra-package imports).
+/// or null if it is a `dart:` import or a `package:` import of another
+/// package (we only care about intra-package imports).
 String? resolveToLibRelative(String importerLibRelativePath, String target) {
   if (target.startsWith('dart:')) return null;
   if (target.startsWith('package:')) {
-    // package:<name>/<rest> - only meaningful if it is this package's own
-    // lib/ (we can't know the package name here reliably without reading
-    // pubspec.yaml, so we treat any package: import whose second segment
-    // looks like our own tree as unresolved and skip it). Callers that
-    // care about package-qualified self-imports should prefer relative
-    // imports; this keeps the tool dependency-free and simple.
+    final self = _packageName;
+    if (self != null && target.startsWith('package:$self/')) {
+      return target.substring('package:$self/'.length);
+    }
     return null;
   }
   // Relative import: resolve against the importing file's directory.
@@ -160,6 +170,7 @@ Future<void> main(List<String> args) async {
     return;
   }
 
+  _packageName = readPackageName();
   final violations = <Violation>[];
   final dartFiles = libDir
       .listSync(recursive: true)
