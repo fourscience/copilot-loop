@@ -34,3 +34,16 @@ export function nodeGate(id: string, script: string, overrides: Partial<GateDefi
     ...overrides,
   };
 }
+
+import { AgentRegistry } from '../src/agents/agent-registry';
+import type { Diagnostic } from '../src/gates/gate-types';
+
+export async function bundledAgents(): Promise<AgentRegistry> {
+  const dir = path.join(REPO_ROOT, 'agents');
+  const files = await fs.readdir(dir);
+  return AgentRegistry.fromFiles(await Promise.all(files.filter((f) => f.endsWith('.agent.md')).map(async (f) => ({ source: f, text: await fs.readFile(path.join(dir, f), 'utf8') }))));
+}
+
+export function diag(category: Diagnostic['category'], extra: Partial<Diagnostic> = {}): Diagnostic {
+  return { gate: extra.gate ?? category, category, severity: 'error', message: `${category} problem`, ...extra };
+}
