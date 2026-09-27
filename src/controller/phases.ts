@@ -275,7 +275,7 @@ export const fix: PhaseHandler = async (ctx, record) => {
   }
   const changed = await changedFiles(ctx.deps, r, writes, ctx.signal);
   const { claimedIteration: _drop, ...rest } = r;
-  return { record: { ...rest, changedFiles: changed, lastFixAgents: [...used] }, next: 'VALIDATE', reason: `specialists finished: ${[...used].join(', ')}`, history: history.length ? history : [{ notes: ['no pending assignments'] }] };
+  return { record: { ...rest, changedFiles: changed, lastFixAgents: [...used], unstableReviews: 0 }, next: 'VALIDATE', reason: `specialists finished: ${[...used].join(', ')}`, history: history.length ? history : [{ notes: ['no pending assignments'] }] };
 };
 
 function reviewDiagnostics(review: ReviewRecord, criteria: LoopRecord['criteria']): Diagnostic[] {
@@ -291,13 +291,24 @@ function reviewDiagnostics(review: ReviewRecord, criteria: LoopRecord['criteria'
   return out;
 }
 
+const MAX_UNSTABLE_REVIEWS = 3;
+
+/** Re-validates when files changed outside the loop, but never ping-pongs forever. */
+function unstableWorkspace(record: LoopRecord, reason: string): StepOutcome {
+  const unstable = record.unstableReviews + 1;
+  if (unstable >= MAX_UNSTABLE_REVIEWS) {
+    return block({ ...record, unstableReviews: unstable }, 'WORKSPACE_ERROR', `The workspace keeps changing between validation and review (${unstable} times). Another process or editor may be modifying files; stop it and Retry.`);
+  }
+  return { record: { ...record, unstableReviews: unstable }, next: 'VALIDATE', reason, history: [{ notes: [`${reason}; re-validating (${unstable}/${MAX_UNSTABLE_REVIEWS})`] }] };
+}
+
 export const review: PhaseHandler = async (ctx, record) => {
   const { deps } = ctx;
   if (record.lastGateResults.length === 0 || !record.validatedWorkspace) {
     return { record, next: 'VALIDATE', reason: 'no validation results to review', history: [{ notes: ['re-validating'] }] };
   }
   if ((await deps.git.workspaceFingerprint(ctx.signal)) !== record.validatedWorkspace) {
-    return { record, next: 'VALIDATE', reason: 'workspace changed since the last validation', history: [{ notes: ['workspace changed after validation; re-validating'] }] };
+    return unstableWorkspace(record, 'workspace changed since the last validation');
   }
   let r = record;
   let inv: InvocationResult<'review'> | undefined;
@@ -327,9 +338,9 @@ export const review: PhaseHandler = async (ctx, record) => {
   if (decision.complete) {
     // The reviewer is read-only, but completion must describe exactly the validated tree.
     if ((await deps.git.workspaceFingerprint(ctx.signal)) !== record.validatedWorkspace) {
-      return { record: r, next: 'VALIDATE', reason: 'workspace changed during review', history };
+      return unstableWorkspace(r, 'workspace changed during review');
     }
-    return { record: r, next: 'DONE', reason: 'all gates passed, all acceptance criteria verified, reviewer PASS', history };
+    return { record: { ...r, unstableReviews: 0 }, next: 'DONE', reason: 'all gates passed, all acceptance criteria verified, reviewer PASS', history };
   }
   const rejections = r.reviewRejections + 1;
   r = { ...r, reviewRejections: rejections, lastFailures: reviewDiagnostics(reviewRecord, decision.criteria) };

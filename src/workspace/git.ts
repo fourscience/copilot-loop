@@ -46,6 +46,9 @@ export function assertGitCommandAllowed(args: readonly string[]): void {
   }
 }
 
+/** Paths never included in snapshots, fingerprints or change lists. */
+export const SNAPSHOT_EXCLUDES: readonly string[] = [':(exclude).copilot-loop'];
+
 export class GitCli implements Git {
   constructor(
     private readonly root: string,
@@ -119,7 +122,8 @@ export class GitCli implements Git {
       }
       const hasHead = (await this.git(['rev-parse', '--verify', '-q', 'HEAD'], { allowFailure: true })).trim() !== '';
       if (!copied && hasHead) await this.git(['read-tree', 'HEAD'], { env, ...(signal ? { signal } : {}) });
-      await this.git(['add', '-A', '--', '.'], { env, ...(signal ? { signal } : {}) });
+      // Loop state is excluded: it changes on every save and is not part of the work product.
+      await this.git(['add', '-A', '--', '.', ...SNAPSHOT_EXCLUDES], { env, ...(signal ? { signal } : {}) });
       return (await this.git(['write-tree'], { env })).trim();
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
@@ -132,7 +136,7 @@ export class GitCli implements Git {
 
   async changedBetween(fromTree: string, toTree: string): Promise<string[]> {
     if (fromTree === toTree) return [];
-    const out = await this.git(['diff', '--name-only', '-z', '--no-renames', fromTree, toTree]);
+    const out = await this.git(['diff', '--name-only', '-z', '--no-renames', fromTree, toTree, '--', '.', ...SNAPSHOT_EXCLUDES]);
     return out.split('\0').filter(Boolean).map(toPosixPath).sort();
   }
 

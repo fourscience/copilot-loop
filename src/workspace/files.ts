@@ -79,11 +79,20 @@ export const DEFAULT_SECRET_PATHS: readonly string[] = [
 ];
 
 export class PathPolicy {
+  private readonly protectedPaths: () => readonly string[];
+
+  /** `protectedPaths` may be a function so the list can follow the active task. */
   constructor(
     readonly root: string,
-    private readonly protectedPaths: readonly string[],
+    protectedPaths: readonly string[] | (() => readonly string[]),
     private readonly secretPaths: readonly string[] = DEFAULT_SECRET_PATHS,
-  ) {}
+  ) {
+    this.protectedPaths = typeof protectedPaths === 'function' ? protectedPaths : () => protectedPaths;
+  }
+
+  protectedList(): readonly string[] {
+    return this.protectedPaths();
+  }
 
   /** Returns a normalised workspace-relative POSIX path or throws TOOL_FAILED. */
   normalise(input: string): string {
@@ -100,7 +109,7 @@ export class PathPolicy {
   }
 
   isProtected(rel: string): boolean {
-    return this.protectedPaths.some((p) => matchesPattern(rel, p));
+    return this.protectedPaths().some((p) => matchesPattern(rel, p));
   }
 
   isSecret(rel: string): boolean {

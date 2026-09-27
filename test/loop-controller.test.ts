@@ -245,3 +245,42 @@ describe('loop controller (mock Copilot)', () => {
     expect(h.calls.filter((c) => c === 'Reviewer')).toHaveLength(1);
   });
 });
+
+describe('workspace stability', () => {
+  it('blocks instead of ping-ponging when the workspace changes before every review', async () => {
+    const h = await makeHarness({ script: [{}] });
+    let n = 0;
+    const save = h.store.save.bind(h.store);
+    h.store.save = async (record) => {
+      await save(record);
+      if (record.state === 'REVIEW') await fs.writeFile(path.join(h.root, 'lib/churn.dart'), `// ${n++}`);
+    };
+    const final = await h.controller.start(loadTask());
+    expect(final.state).toBe('BLOCKED');
+    expect(final.blocked?.code).toBe('WORKSPACE_ERROR');
+    expect(h.gates.validations).toBe(3);
+  });
+});
+
+describe('interrupt', () => {
+  it('interrupt cancels in-flight work and leaves a resumable PAUSED run', async () => {
+    const h = await makeHarness({
+      script: [{}],
+      agents: {
+        Implementer: (request, n) =>
+          n === 0
+            ? new Promise((_resolve, reject) => {
+                request.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+                setTimeout(() => void h.controller.interrupt(), 10);
+              })
+            : { text: CHANGE_JSON, toolCalls: [] },
+      },
+    });
+    const paused = await h.controller.start(loadTask());
+    expect(paused.state).toBe('PAUSED');
+    expect(paused.pausedFrom).toBe('IMPLEMENT');
+    const done = await h.controller.resume();
+    expect(done.state).toBe('DONE');
+    expect(done.iteration).toBe(1);
+  });
+});

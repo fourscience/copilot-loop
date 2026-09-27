@@ -16,9 +16,10 @@ export interface InvokerDependencies {
   repository: Repository;
   clock: Clock;
   logger: Logger;
-  toolContext: Omit<ToolContext, 'signal' | 'onWrite' | 'validationBudget'>;
+  toolContext: Omit<ToolContext, 'signal' | 'onWrite' | 'validationBudget' | 'allowedGates'>;
   instructions: () => Promise<RepositoryInstruction[]>;
-  protectedPaths: readonly string[];
+  /** Protected paths for the active task (defaults + task + gate configuration files). */
+  protectedPaths: (record: LoopRecord) => readonly string[];
   modelPreferences: Partial<Record<AgentId, string>>;
   /** Called before the model request starts (UI: current agent/model). */
   onAgentStart?: (agent: AgentId, model: ModelInfo) => void;
@@ -100,7 +101,7 @@ export async function invokeAgent<K extends keyof OutputTypes>(
     ...(record.plan ? { plan: record.plan } : {}),
     gates: record.lastGateResults.map(summariseGate),
     ...(record.lastReview ? { review: record.lastReview } : {}),
-    protectedPaths: deps.protectedPaths,
+    protectedPaths: deps.protectedPaths(record),
     requirementRules: record.task.requirements.map((r) => `requirement ${r.name}: must satisfy ${r.gates.join(', ')}`),
   });
   const prompt = buildPrompt({ agent, task: record.task, packet, instructions: await deps.instructions(), assignmentText: options.assignmentText, maxInputTokens });
@@ -113,7 +114,7 @@ export async function invokeAgent<K extends keyof OutputTypes>(
     model,
     system: prompt.system,
     user: prompt.user,
-    toolContext: { ...deps.toolContext, ...(options.signal ? { signal: options.signal } : {}), onWrite: options.onWrite ?? (() => undefined), validationBudget: { remaining: 3 } },
+    toolContext: { ...deps.toolContext, allowedGates: record.task.gates, ...(options.signal ? { signal: options.signal } : {}), onWrite: options.onWrite ?? (() => undefined), validationBudget: { remaining: 3 } },
     maxTurns: record.task.limits.maxAgentTurns,
     maxInputTokens,
     ...(options.signal ? { signal: options.signal } : {}),

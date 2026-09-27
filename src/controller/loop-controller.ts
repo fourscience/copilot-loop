@@ -93,6 +93,7 @@ export class LoopController {
       iterationBase: 0,
       agentRunBase: 0,
       reviewRejections: 0,
+      unstableReviews: 0,
       escalation: 0,
       historySequence: 0,
       criteria: initialCriteria(loaded.task),
@@ -156,6 +157,20 @@ export class LoopController {
     });
   }
 
+  /**
+   * Immediate pause (used when VS Code shuts down): cancels in-flight model
+   * requests and gate processes and pauses. The interrupted step re-runs on
+   * resume; an already-claimed iteration is not consumed twice.
+   */
+  async interrupt(): Promise<LoopRecord | undefined> {
+    if (this.running) {
+      this.pauseRequested = true;
+      this.abort?.abort();
+      return this.running;
+    }
+    return this.current;
+  }
+
   /** Stops immediately: cancels in-flight model requests and gate processes. */
   async stop(): Promise<LoopRecord | undefined> {
     this.assertNotBusy();
@@ -180,7 +195,7 @@ export class LoopController {
     if (record.state !== 'BLOCKED') throw new LoopError('CONFIGURATION_ERROR', `Retry is only available when BLOCKED (current: ${record.state})`);
     const target: LoopState = record.plan ? 'VALIDATE' : 'INTAKE';
     const fingerprints = Object.fromEntries(Object.entries(record.fingerprints).map(([k, v]) => [k, { ...v, consecutive: 0 }]));
-    const reset: LoopRecord = { ...record, fingerprints, progress: [], escalation: 0, reviewRejections: 0, iterationBase: record.iteration, agentRunBase: record.agentRuns, pending: [] };
+    const reset: LoopRecord = { ...record, fingerprints, progress: [], escalation: 0, reviewRejections: 0, unstableReviews: 0, iterationBase: record.iteration, agentRunBase: record.agentRuns, pending: [] };
     delete reset.claimedIteration;
     await this.commit(transition(reset, target, `retry by user after ${record.blocked?.code ?? 'block'}`, this.clock));
     });
@@ -270,12 +285,16 @@ export class LoopController {
       for (;;) {
         const record = this.requireRecord();
         if (!isActive(record.state)) return this.current as LoopRecord;
-        if (this.stopRequested || signal.aborted) {
+        if (this.stopRequested) {
           await this.commit(transition(record, 'STOPPED', 'stopped by user', this.clock));
           continue;
         }
         if (this.pauseRequested) {
           await this.commit(transition(record, 'PAUSED', 'paused by user', this.clock));
+          continue;
+        }
+        if (signal.aborted) {
+          await this.commit(transition(record, 'STOPPED', 'cancelled', this.clock));
           continue;
         }
         if (++steps > maxSteps) {
@@ -305,9 +324,9 @@ export class LoopController {
           const e = toLoopError(error, 'WORKSPACE_ERROR', `${record.state} step failed`);
           const latest = this.requireRecord();
           if (e.code === 'USER_CANCELLED' || signal.aborted) {
-            const to: LoopState = this.stopRequested || !this.pauseRequested ? 'STOPPED' : 'PAUSED';
+            const to: LoopState = !this.stopRequested && this.pauseRequested ? 'PAUSED' : 'STOPPED';
             this.logger.warn(`${record.state} cancelled → ${to}`);
-            const after = transition(latest, to, this.stopRequested ? 'stopped by user' : 'cancelled', this.clock);
+            const after = transition(latest, to, to === 'PAUSED' ? 'interrupted; step will re-run on resume' : 'stopped by user', this.clock);
             await this.commit(await this.writeHistory(latest, after, [{ notes: ['cancelled'] }], startedAt, 'cancelled'));
             continue;
           }
